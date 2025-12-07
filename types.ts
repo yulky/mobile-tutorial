@@ -1,14 +1,13 @@
 export interface MarkerData {
-  id: string;
+  id: string; // Строка для совместимости, но в БД это число
   latitude: number;
   longitude: number;
-  title?: string;
-  description?: string;
+  title: string;
   images: ImageData[];
 }
 
 export interface ImageData {
-  id: string;
+  id: string; // Строка для совместимости, но в БД это число
   uri: string;
   timestamp: number;
 }

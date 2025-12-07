@@ -1,10 +1,11 @@
-import { useMarkers } from '@/context/MarkerContext';
-import { ImageData } from '@/types';
+import { useDatabase } from '@/context/DatabaseContext';
+import { MarkerData } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
@@ -14,24 +15,53 @@ import {
   View,
 } from 'react-native';
 
+
 export default function MarkerDetails() {
   const params = useLocalSearchParams();
+  const router = useRouter();
   const markerId = Array.isArray(params.id) ? params.id[0] : params.id;
   
-  const { getMarker, addImageToMarker, removeImageFromMarker, markers } = useMarkers();
+  const { getMarker, addImageToMarker, deleteImage, deleteMarker } = useDatabase();
   
-  const marker = markerId ? getMarker(markerId) : undefined;
-  
+  const [marker, setMarker] = useState<MarkerData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Загружаем маркер при каждом фокусе на экране
+  useFocusEffect(
+    useCallback(() => {
+      loadMarker();
+    }, [markerId])
+  );
+
   useEffect(() => {
     requestPermissions();
   }, []);
+
+  const loadMarker = async () => {
+    if (!markerId) return;
+    
+    try {
+      setIsLoading(true);
+      console.log('MarkerDetails: Загрузка маркера:', markerId);
+      
+      const loadedMarker = await getMarker(parseInt(markerId));
+      
+      console.log('MarkerDetails: Маркер загружен:', loadedMarker);
+      setMarker(loadedMarker);
+    } catch (err) {
+      console.error('MarkerDetails: Ошибка загрузки маркера:', err);
+      Alert.alert('Ошибка', 'Не удалось загрузить маркер');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const requestPermissions = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert(
         'Требуется разрешение',
-        'Пожалуйста дайте разрешение!'
+        'Пожалуйста дайте разрешение на доступ к галерее!'
       );
     }
   };
@@ -47,21 +77,24 @@ export default function MarkerDetails() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        const newImage: ImageData = {
-          id: Date.now().toString(),
-          uri: result.assets[0].uri,
-          timestamp: Date.now(),
-        };
-        addImageToMarker(markerId, newImage);
+        console.log('MarkerDetails: Добавление изображения...');
+        
+        await addImageToMarker(parseInt(markerId), result.assets[0].uri);
+        
+        console.log('MarkerDetails: Изображение добавлено');
+        
+        // Перезагружаем маркер для отображения нового изображения
+        await loadMarker();
+        
+        Alert.alert('Успех', 'Фотография добавлена!');
       }
-    } 
-    catch (error) {
+    } catch (error) {
+      console.error('MarkerDetails: Ошибка добавления фото:', error);
       Alert.alert('Ошибка', 'Произошла ошибка при выборе фото, попробуйте еще позже.');
-      console.error('Image picker error:', error);
     }
   };
 
-  const deleteImage = (imageId: string) => {
+  const handleDeleteImage = (imageId: string) => {
     if (!markerId) return;
     
     Alert.alert(
@@ -72,13 +105,68 @@ export default function MarkerDetails() {
         {
           text: 'Удалить',
           style: 'destructive',
-          onPress: () => {
-            removeImageFromMarker(markerId, imageId);
+          onPress: async () => {
+            try {
+              console.log('MarkerDetails: Удаление изображения:', imageId);
+              
+              await deleteImage(parseInt(markerId), parseInt(imageId));
+              
+              console.log('MarkerDetails: Изображение удалено');
+              
+              // Перезагружаем маркер
+              await loadMarker();
+              
+              Alert.alert('Успех', 'Фотография удалена');
+            } catch (err) {
+              console.error('MarkerDetails: Ошибка удаления фото:', err);
+              Alert.alert('Ошибка', 'Не удалось удалить фотографию');
+            }
           },
         },
       ]
     );
   };
+
+  const handleDeleteMarker = () => {
+    if (!markerId) return;
+    
+    Alert.alert(
+      'Удаление маркера',
+      'Вы уверены что хотите удалить этот маркер и все его фотографии?',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('MarkerDetails: Удаление маркера:', markerId);
+              
+              await deleteMarker(parseInt(markerId));
+              
+              console.log('MarkerDetails: Маркер удален');
+              
+              Alert.alert('Успех', 'Маркер удален', [
+                { text: 'OK', onPress: () => router.back() }
+              ]);
+            } catch (err) {
+              console.error('MarkerDetails: Ошибка удаления маркера:', err);
+              Alert.alert('Ошибка', 'Не удалось удалить маркер');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#ffd33d" />
+        <Text style={styles.loadingText}>Загрузка...</Text>
+      </View>
+    );
+  }
 
   if (!marker) {
     return (
@@ -86,10 +174,17 @@ export default function MarkerDetails() {
         <Ionicons name="alert-circle-outline" size={64} color="#666" />
         <Text style={styles.errorText}>Маркер не найден</Text>
         <Text style={styles.errorSubtext}>ID: {markerId || 'не определён'}</Text>
-        <Text style={styles.errorSubtext}>Всего маркеров: {markers.length}</Text>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backButtonText}>Вернуться к карте</Text>
+        </TouchableOpacity>
       </View>
     );
   }
+
+  console.log('MarkerDetails: Рендеринг маркера с фото:', marker.images.length);
 
   return (
     <View style={styles.container}>
@@ -101,6 +196,14 @@ export default function MarkerDetails() {
             Координаты: {marker.latitude.toFixed(4)}, {marker.longitude.toFixed(4)}
           </Text>
           <Text style={styles.infoText}>Фотографии: {marker.images.length}</Text>
+          
+          <TouchableOpacity 
+            style={styles.deleteMarkerButton}
+            onPress={handleDeleteMarker}
+          >
+            <Ionicons name="trash-outline" size={20} color="#fff" />
+            <Text style={styles.deleteMarkerButtonText}>Удалить маркер</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.imagesSection}>
@@ -126,7 +229,7 @@ export default function MarkerDetails() {
                 <View key={image.id} style={styles.imageContainer}>
                   <Image source={{ uri: image.uri }} style={styles.image} />
                   <TouchableOpacity
-                    onPress={() => deleteImage(image.id)}
+                    onPress={() => handleDeleteImage(image.id)}
                     style={styles.deleteButton}
                   >
                     <Ionicons name="close-circle" size={28} color="#ff4444" />
@@ -153,6 +256,11 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+    marginTop: 12,
+  },
   errorText: {
     color: '#fff',
     fontSize: 18,
@@ -165,6 +273,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 8,
+  },
+  backButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#ffd33d',
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#25292e',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   infoSection: {
     padding: 16,
@@ -182,6 +302,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ccc',
     marginBottom: 8,
+  },
+  deleteMarkerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#ff4444',
+    borderRadius: 8,
+  },
+  deleteMarkerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   imagesSection: {
     padding: 16,

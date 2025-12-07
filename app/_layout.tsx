@@ -1,9 +1,9 @@
-import { MarkerProvider } from '@/context/MarkerContext';
+import { DatabaseProvider } from '@/context/DatabaseContext';
 import { Stack } from 'expo-router';
 
 export default function RootLayout() {
   return (
-    <MarkerProvider>
+    <DatabaseProvider>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen 
@@ -18,6 +18,6 @@ export default function RootLayout() {
           }} 
         />
       </Stack>
-    </MarkerProvider>
+    </DatabaseProvider>
   );
 }
