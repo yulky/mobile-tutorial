@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { DBMarker, DBMarkerImage } from './schema';
+import { DBMarker, DBMarkerImage } from '../types';
 
 export class DatabaseOperations {
   constructor(private db: SQLite.SQLiteDatabase) {}

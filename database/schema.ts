@@ -1,20 +1,5 @@
 import * as SQLite from 'expo-sqlite';
 
-export interface DBMarker {
-  id: number;
-  latitude: number;
-  longitude: number;
-  title: string;
-  created_at: string;
-}
-
-export interface DBMarkerImage {
-  id: number;
-  marker_id: number;
-  uri: string;
-  created_at: string;
-}
-
 export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
   try {
     const db = await SQLite.openDatabaseAsync('markers.db');

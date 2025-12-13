@@ -8,8 +8,8 @@ interface DatabaseContextType {
   // Операции с маркерами
   addMarker: (latitude: number, longitude: number, title: string) => Promise<number>;
   getMarkers: () => Promise<MarkerData[]>;
-  getMarker: (id: number) => Promise<MarkerData | null>;
-  deleteMarker: (id: number) => Promise<void>;
+  getMarker: (id: number) => Promise<MarkerData | null>
+  deleteMarker: (id: number) => Promise<void>
   
   // Операции с изображениями
   addImageToMarker: (markerId: number, uri: string) => Promise<void>;
