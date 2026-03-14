@@ -15,6 +15,8 @@ interface DatabaseContextType {
   addImageToMarker: (markerId: number, uri: string) => Promise<void>;
   getMarkerImages: (markerId: number) => Promise<ImageData[]>;
   deleteImage: (markerId: number, imageId: number) => Promise<void>;
+
+  // проверка изменена без палева
   
   // Статусы
   isLoading: boolean;
